@@ -1,4 +1,4 @@
-secrets(todo small vec support)
+secrets(todo small and rc vec support)
 =======
 
 [![Build Status][badge-ci]][ci]
