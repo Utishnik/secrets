@@ -1,5 +1,5 @@
 [package]
-name    = "secrets"
+name = "secrets-tweaked"
 version = "1.2.0"
 edition = "2024"
 
@@ -10,7 +10,7 @@ description = "Protected-access memory for cryptographic secrets"
 
 license       = "MIT OR Apache-2.0"
 homepage      = "https://github.com/stouset/secrets"
-repository    = "https://github.com/stouset/secrets"
+repository    = "https://github.com/Utishnik/secrets"
 documentation = "https://stouset.github.io/secrets"
 readme        = "README.md"
 
