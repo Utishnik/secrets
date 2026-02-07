@@ -34,10 +34,7 @@ pub unsafe trait Zeroable: AsContiguousBytes {
     /// references must not overlap.
     unsafe fn transfer(&mut self, other: &mut Self) {
         unsafe {
-            sodium::memtransfer(
-                self .as_mut_bytes(),
-                other.as_mut_bytes(),
-            );
+            sodium::memtransfer(self.as_mut_bytes(), other.as_mut_bytes());
         };
     }
 }

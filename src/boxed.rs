@@ -89,7 +89,7 @@ impl<T: Bytes> Box<T> {
     /// [`Box`] will be locked before it is returned from this function.
     pub(crate) fn try_new<U, E, F>(len: usize, init: F) -> Result<Self, E>
     where
-        F: FnOnce(&mut Self) -> Result<U, E>
+        F: FnOnce(&mut Self) -> Result<U, E>,
     {
         let mut boxed = Self::new_unlocked(len);
 
@@ -170,11 +170,15 @@ impl<T: Bytes> Box<T> {
         // we use never! here to ensure that panics happen in both debug
         // and release builds since it would be a violation of memory-
         // safety if a zero-length dereference happens
-        never!(self.is_empty(),
-            "secrets: attempted to dereference a zero-length pointer");
+        never!(
+            self.is_empty(),
+            "secrets: attempted to dereference a zero-length pointer"
+        );
 
-        proven!(self.prot.get() != Prot::NoAccess,
-            "secrets: may not call Box::as_ref while locked");
+        proven!(
+            self.prot.get() != Prot::NoAccess,
+            "secrets: may not call Box::as_ref while locked"
+        );
 
         unsafe { self.ptr.as_ref() }
     }
@@ -189,11 +193,15 @@ impl<T: Bytes> Box<T> {
         // we use never! here to ensure that panics happen in both debug
         // and release builds since it would be a violation of memory-
         // safety if a zero-length dereference happens
-        never!(self.is_empty(),
-            "secrets: attempted to dereference a zero-length pointer");
+        never!(
+            self.is_empty(),
+            "secrets: attempted to dereference a zero-length pointer"
+        );
 
-        proven!(self.prot.get() == Prot::ReadWrite,
-            "secrets: may not call Box::as_mut unless mutably unlocked");
+        proven!(
+            self.prot.get() == Prot::ReadWrite,
+            "secrets: may not call Box::as_mut unless mutably unlocked"
+        );
 
         unsafe { self.ptr.as_mut() }
     }
@@ -215,30 +223,24 @@ impl<T: Bytes> Box<T> {
         // be indicative of a bug, so we want to detect this during
         // development. If it happens in release mode, it's not
         // explicitly unsafe so we don't need to enable this check.
-        proven!(self.prot.get() != Prot::NoAccess,
-            "secrets: may not call Box::as_slice while locked");
+        proven!(
+            self.prot.get() != Prot::NoAccess,
+            "secrets: may not call Box::as_slice while locked"
+        );
 
-        unsafe {
-            slice::from_raw_parts(
-                self.ptr.as_ptr(),
-                self.len,
-            )
-        }
+        unsafe { slice::from_raw_parts(self.ptr.as_ptr(), self.len) }
     }
 
     /// Converts the [`Box`]'s contents into a mutable slice. This must
     /// only happen while it is mutably unlocked, and the slice must go
     /// out of scope before it is locked.
     pub(crate) fn as_mut_slice(&mut self) -> &mut [T] {
-        proven!(self.prot.get() == Prot::ReadWrite,
-            "secrets: may not call Box::as_mut_slice unless mutably unlocked");
+        proven!(
+            self.prot.get() == Prot::ReadWrite,
+            "secrets: may not call Box::as_mut_slice unless mutably unlocked"
+        );
 
-        unsafe {
-            slice::from_raw_parts_mut(
-                self.ptr.as_ptr(),
-                self.len,
-            )
-        }
+        unsafe { slice::from_raw_parts_mut(self.ptr.as_ptr(), self.len) }
     }
 
     /// Instantiates a new [`Box`] that can hold `len` elements of type
@@ -284,8 +286,10 @@ impl<T: Bytes> Box<T> {
         if refs == 0 {
             // when retaining, we must retain to a protection level with
             // some access
-            proven!(prot != Prot::NoAccess,
-                "secrets: must retain readably or writably");
+            proven!(
+                prot != Prot::NoAccess,
+                "secrets: must retain readably or writably"
+            );
 
             // allow access to the pointer and record what level of
             // access is being permitted
@@ -308,12 +312,18 @@ impl<T: Bytes> Box<T> {
             //   * our target protection level *must* be `ReadOnly`
             //     since otherwise would involve changing the protection
             //     level of a currently-borrowed resource
-            proven!(Prot::NoAccess != self.prot.get(),
-                "secrets: out-of-order retain/release detected");
-            proven!(Prot::ReadWrite != self.prot.get(),
-                "secrets: cannot unlock mutably more than once");
-            proven!(Prot::ReadOnly == prot,
-                "secrets: cannot unlock mutably while unlocked immutably");
+            proven!(
+                Prot::NoAccess != self.prot.get(),
+                "secrets: out-of-order retain/release detected"
+            );
+            proven!(
+                Prot::ReadWrite != self.prot.get(),
+                "secrets: cannot unlock mutably more than once"
+            );
+            proven!(
+                Prot::ReadOnly == prot,
+                "secrets: cannot unlock mutably while unlocked immutably"
+            );
         }
 
         // "255 retains ought to be enough for anybody"
@@ -329,9 +339,11 @@ impl<T: Bytes> Box<T> {
         // ref counter to wrap around below zero, the subsequent
         // `retain` will panic here.
         match refs.checked_add(1) {
-            Some(v)                  => self.refs.set(v),
-            None if self.is_locked() => panic!("secrets: out-of-order retain/release detected"),
-            None                     => panic!("secrets: retained too many times"),
+            Some(v) => self.refs.set(v),
+            None if self.is_locked() => {
+                panic!("secrets: out-of-order retain/release detected")
+            }
+            None => panic!("secrets: retained too many times"),
         }
     }
 
@@ -342,14 +354,15 @@ impl<T: Bytes> Box<T> {
         // When releasing, we should always have at least one retain
         // outstanding. This is enforced by all users through
         // refcounting on allocation and drop.
-        proven!(self.refs.get() != 0,
-            "secrets: releases exceeded retains");
+        proven!(self.refs.get() != 0, "secrets: releases exceeded retains");
 
         // When releasing, our protection level must allow some kind of
         // access. If this condition isn't true, it was already
         // [`Prot::NoAccess`] so at least the memory was protected.
-        proven!(self.prot.get() != Prot::NoAccess,
-            "secrets: releasing memory that's already locked");
+        proven!(
+            self.prot.get() != Prot::NoAccess,
+            "secrets: releasing memory that's already locked"
+        );
 
         // Deciding whether or not to use `checked_sub` or
         // `wrapping_sub` here has pros and cons. The `proven!`s above
@@ -410,13 +423,14 @@ impl<T: Bytes> Drop for Box<T> {
             // every retain has been balanced with a release. If this
             // is not true in release, the memory will be freed
             // momentarily so we don't need to worry about it.
-            proven!(self.refs.get() == 0,
-                "secrets: retains exceeded releases");
+            proven!(self.refs.get() == 0, "secrets: retains exceeded releases");
 
             // Similarly, any dropped value should have previously been
             // set to deny any access.
-            proven!(self.prot.get() == Prot::NoAccess,
-                "secrets: dropped secret was still accessible");
+            proven!(
+                self.prot.get() == Prot::NoAccess,
+                "secrets: dropped secret was still accessible"
+            );
         }
 
         unsafe { sodium::free(self.ptr.as_mut()) }
@@ -481,8 +495,8 @@ unsafe impl<T: Bytes + Send> Send for Box<T> {}
 /// Immediately changes the page protection level on `ptr` to `prot`.
 fn mprotect<T>(ptr: *mut T, prot: Prot) {
     if !match prot {
-        Prot::NoAccess  => unsafe { sodium::mprotect_noaccess(ptr)  },
-        Prot::ReadOnly  => unsafe { sodium::mprotect_readonly(ptr)  },
+        Prot::NoAccess => unsafe { sodium::mprotect_noaccess(ptr) },
+        Prot::ReadOnly => unsafe { sodium::mprotect_readonly(ptr) },
         Prot::ReadWrite => unsafe { sodium::mprotect_readwrite(ptr) },
     } {
         panic!("secrets: error setting memory protection to {prot:?}");
@@ -507,14 +521,14 @@ mod tests {
 
     #[test]
     fn it_initializes_with_garbage() {
-        let boxed   = Box::<u8>::new(4, |_| {});
+        let boxed = Box::<u8>::new(4, |_| {});
         let unboxed = boxed.unlock().as_slice();
 
         // sodium changed the value of the garbage byte they used, so we
         // allocate a byte and see what's inside to probe for the
         // specific value
         let garbage = unsafe {
-            let garbage_ptr  = sodium::allocarray::<u8>(1);
+            let garbage_ptr = sodium::allocarray::<u8>(1);
             let garbage_byte = *garbage_ptr;
 
             sodium::free(garbage_ptr);
@@ -541,9 +555,9 @@ mod tests {
     #[test]
     fn it_initializes_from_values() {
         let mut value = [4_u64];
-        let     boxed = Box::from(&mut value[..]);
+        let boxed = Box::from(&mut value[..]);
 
-        assert_eq!(value,                     [0]);
+        assert_eq!(value, [0]);
         assert_eq!(boxed.unlock().as_slice(), [4]);
 
         boxed.lock();
@@ -592,7 +606,9 @@ mod tests {
         let _ = boxed.unlock();
         assert_eq!(3, boxed.refs.get());
 
-        boxed.lock(); boxed.lock(); boxed.lock();
+        boxed.lock();
+        boxed.lock();
+        boxed.lock();
         assert_eq!(0, boxed.refs.get());
 
         let _ = boxed.unlock_mut();
@@ -617,7 +633,7 @@ mod tests {
 
     #[test]
     fn it_allows_arbitrary_readers() {
-        let     boxed = Box::<u8>::zero(1);
+        let boxed = Box::<u8>::zero(1);
         let mut count = 0_u8;
 
         sodium::memrandom(count.as_mut_bytes());
@@ -652,7 +668,7 @@ mod tests {
         let (boxed, value) = rx.recv().expect("failed to read from channel");
 
         assert_eq!(Prot::ReadOnly, boxed.prot.get());
-        assert_eq!(value,          boxed.as_slice());
+        assert_eq!(value, boxed.as_slice());
 
         child.join().expect("child terminated");
         boxed.lock();
@@ -694,9 +710,10 @@ mod tests {
         let _ = Box::<u8>::zero(0);
     }
 
-
     #[test]
-    #[should_panic(expected = "secrets: error setting memory protection to NoAccess")]
+    #[should_panic(
+        expected = "secrets: error setting memory protection to NoAccess"
+    )]
     fn it_detects_sodium_mprotect_failure() {
         sodium::fail();
         mprotect(std::ptr::null_mut::<u8>(), Prot::NoAccess);
@@ -715,13 +732,16 @@ mod tests_sigsegv {
         F: FnOnce(),
     {
         unsafe {
-            let pid      : libc::pid_t = libc::fork();
-            let mut stat : libc::c_int = 0;
+            let pid: libc::pid_t = libc::fork();
+            let mut stat: libc::c_int = 0;
 
             match pid {
                 -1 => panic!("`fork(2)` failed"),
-                0  => { f(); process::exit(0) },
-                _  => {
+                0 => {
+                    f();
+                    process::exit(0)
+                }
+                _ => {
                     if libc::waitpid(pid, &mut stat, 0) == -1 {
                         panic!("`waitpid(2)` failed");
                     };
@@ -733,8 +753,8 @@ mod tests_sigsegv {
                     // either of which can be sent by an attempt to
                     // access protected memory regions
                     assert!(
-                        libc::WTERMSIG(stat) == libc::SIGBUS ||
-                        libc::WTERMSIG(stat) == libc::SIGSEGV
+                        libc::WTERMSIG(stat) == libc::SIGBUS
+                            || libc::WTERMSIG(stat) == libc::SIGSEGV
                     );
                 }
             }
@@ -762,16 +782,13 @@ mod tests_sigsegv {
     fn it_kills_attempts_to_read_after_explicitly_locked() {
         assert_sigsegv(|| {
             let boxed = Box::<u32>::random(4);
-            let val   = boxed.unlock().as_slice();
-            let _     = boxed.unlock();
+            let val = boxed.unlock().as_slice();
+            let _ = boxed.unlock();
 
             boxed.lock();
             boxed.lock();
 
-            let _ = sodium::memcmp(
-                val.as_bytes(),
-                val.as_bytes(),
-            );
+            let _ = sodium::memcmp(val.as_bytes(), val.as_bytes());
         });
     }
 }
@@ -781,10 +798,12 @@ mod tests_proven_statements {
     use super::*;
 
     #[test]
-    #[should_panic(expected = "secrets: attempted to dereference a zero-length pointer")]
+    #[should_panic(
+        expected = "secrets: attempted to dereference a zero-length pointer"
+    )]
     fn it_doesnt_allow_referencing_zero_length() {
         let boxed = Box::<u8>::new_unlocked(0);
-        let _     = boxed.as_ref();
+        let _ = boxed.as_ref();
     }
 
     #[test]
@@ -806,13 +825,15 @@ mod tests_proven_statements {
     #[should_panic(expected = "secrets: releases exceeded retains")]
     fn it_doesnt_allow_unbalanced_locking() {
         let boxed = Box::<u64>::zero(4);
-        let _     = boxed.unlock();
+        let _ = boxed.unlock();
         boxed.lock();
         boxed.lock();
     }
 
     #[test]
-    #[should_panic(expected = "secrets: cannot unlock mutably while unlocked immutably")]
+    #[should_panic(
+        expected = "secrets: cannot unlock mutably while unlocked immutably"
+    )]
     fn it_doesnt_allow_different_access_types() {
         let mut boxed = Box::<[u128; 128]>::zero(5);
 
@@ -839,13 +860,17 @@ mod tests_proven_statements {
     }
 
     #[test]
-    #[should_panic(expected = "secrets: may not call Box::as_mut unless mutably unlocked")]
+    #[should_panic(
+        expected = "secrets: may not call Box::as_mut unless mutably unlocked"
+    )]
     fn it_doesnt_allow_as_mut_while_locked() {
         let _ = Box::<u8>::zero(1).as_mut();
     }
 
     #[test]
-    #[should_panic(expected = "secrets: may not call Box::as_mut unless mutably unlocked")]
+    #[should_panic(
+        expected = "secrets: may not call Box::as_mut unless mutably unlocked"
+    )]
     fn it_doesnt_allow_as_mut_while_readonly() {
         let mut boxed = Box::<u8>::zero(1);
         let _ = boxed.unlock();
@@ -853,19 +878,25 @@ mod tests_proven_statements {
     }
 
     #[test]
-    #[should_panic(expected = "secrets: may not call Box::as_slice while locked")]
+    #[should_panic(
+        expected = "secrets: may not call Box::as_slice while locked"
+    )]
     fn it_doesnt_allow_as_slice_while_locked() {
         let _ = Box::<u8>::zero(1).as_slice();
     }
 
     #[test]
-    #[should_panic(expected = "secrets: may not call Box::as_mut_slice unless mutably unlocked")]
+    #[should_panic(
+        expected = "secrets: may not call Box::as_mut_slice unless mutably unlocked"
+    )]
     fn it_doesnt_allow_as_mut_slice_while_locked() {
         let _ = Box::<u8>::zero(1).as_mut_slice();
     }
 
     #[test]
-    #[should_panic(expected = "secrets: may not call Box::as_mut_slice unless mutably unlocked")]
+    #[should_panic(
+        expected = "secrets: may not call Box::as_mut_slice unless mutably unlocked"
+    )]
     fn it_doesnt_allow_as_mut_slice_while_readonly() {
         let mut boxed = Box::<u8>::zero(1);
         let _ = boxed.unlock();

@@ -194,8 +194,7 @@ impl<T: Bytes> SecretVec<T> {
     where
         F: FnOnce(&mut [T]) -> Result<U, E>,
     {
-        Box::try_new(1, |b| f(b.as_mut_slice()))
-            .map(|b| Self { boxed: b })
+        Box::try_new(1, |b| f(b.as_mut_slice())).map(|b| Self { boxed: b })
     }
 
     /// Returns the number of elements in the [`SecretVec`].
@@ -438,7 +437,7 @@ mod test {
     #[test]
     fn it_allows_borrowing_immutably() {
         let secret = SecretVec::<u64>::zero(2);
-        let s      = secret.borrow();
+        let s = secret.borrow();
 
         assert_eq!(*s, [0, 0]);
     }
@@ -446,7 +445,7 @@ mod test {
     #[test]
     fn it_allows_borrowing_mutably() {
         let mut secret = SecretVec::<u64>::zero(2);
-        let mut s      = secret.borrow_mut();
+        let mut s = secret.borrow_mut();
 
         s.clone_from_slice(&[7, 1][..]);
 
@@ -504,7 +503,7 @@ mod test {
 
     #[test]
     fn it_safely_clones_immutable_references() {
-        let secret   = SecretVec::<u8>::random(4);
+        let secret = SecretVec::<u8>::random(4);
         let borrow_1 = secret.borrow();
         let borrow_2 = borrow_1.clone();
 

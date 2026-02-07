@@ -209,7 +209,9 @@ impl<T: Bytes> Drop for Secret<T> {
         // Windows, it does. We'll ignore it for now, and provide a better fix later.
         if unsafe { !sodium::munlock(&raw mut self.data) }
             && !(cfg!(target_family = "windows")
-                && (std::io::Error::last_os_error().raw_os_error() == Some(158))) {
+                && (std::io::Error::last_os_error().raw_os_error()
+                    == Some(158)))
+        {
             // [`Drop::drop`] is called during stack unwinding, so we
             // may be in a panic already.
             assert!(

@@ -17,15 +17,18 @@ impl Profile {
             env::var("COVERAGE").is_ok(),
             env::var("PROFILE").as_ref().map(String::as_str),
         ) {
-            (true, _)              => Profile::Coverage,
+            (true, _) => Profile::Coverage,
             (false, Ok("release")) => Profile::Release,
-            (false, Ok("debug"))   => Profile::Debug,
+            (false, Ok("debug")) => Profile::Debug,
 
             // unknown profile
             (false, Ok(profile)) => {
-                println!("cargo:warning=\"unknown profile {}, defaulting to debug\"", profile);
+                println!(
+                    "cargo:warning=\"unknown profile {}, defaulting to debug\"",
+                    profile
+                );
                 Profile::Debug
-            },
+            }
 
             // this should only happen if we typo'd an env key
             (false, Err(err)) => {
@@ -35,7 +38,9 @@ impl Profile {
 
         println!("cargo::rerun-if-env-changed=COVERAGE");
         println!("cargo::rerun-if-env-changed=PROFILE");
-        println!("cargo::rustc-check-cfg=cfg(profile, values(\"coverage\", \"debug\", \"release\"))");
+        println!(
+            "cargo::rustc-check-cfg=cfg(profile, values(\"coverage\", \"debug\", \"release\"))"
+        );
         println!("cargo::rustc-cfg=profile=\"{}\"", profile);
 
         profile
@@ -45,9 +50,9 @@ impl Profile {
 impl fmt::Display for Profile {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Profile::Debug    => write!(f, "debug"),
+            Profile::Debug => write!(f, "debug"),
             Profile::Coverage => write!(f, "coverage"),
-            Profile::Release  => write!(f, "release"),
+            Profile::Release => write!(f, "release"),
         }
     }
 }
@@ -89,19 +94,24 @@ fn link(name: &str, version: &str) -> Option<()> {
             // (`command "--flag" "\"quoted args\""`) but in the
             // specific case of pkg-config, it's probably never going to
             // produce incorrect output in practice.
-            let cmd = command.split(' ').map(|s| {
-                match s.starts_with('"') && s.ends_with('"') {
-                    true  => s.trim_matches('"'),
-                    false => s
-                }
-            }).collect::<Vec<&str>>().join(" ");
+            let cmd = command
+                .split(' ')
+                .map(|s| match s.starts_with('"') && s.ends_with('"') {
+                    true => s.trim_matches('"'),
+                    false => s,
+                })
+                .collect::<Vec<&str>>()
+                .join(" ");
 
-            println!("cargo:warning=failed to run `{}`; is pkg-config in your PATH?", cmd);
+            println!(
+                "cargo:warning=failed to run `{}`; is pkg-config in your PATH?",
+                cmd
+            );
             println!("cargo:warning=using default linker options");
-        },
+        }
         Err(Error::EnvNoPkgConfig(_)) => (),
-        Err(err)                      => panic!("failed to link against {}: {}", name, err),
-        Ok(_)                         => return Some(()),
+        Err(err) => panic!("failed to link against {}: {}", name, err),
+        Ok(_) => return Some(()),
     };
 
     None
@@ -110,7 +120,7 @@ fn link(name: &str, version: &str) -> Option<()> {
 #[cfg(all(not(feature = "use-libsodium-sys"), target_family = "windows"))]
 fn link(name: &str, _version: &str) -> Option<()> {
     match vcpkg::Config::new().emit_includes(true).find_package(name) {
-        Ok(_) => Some( () ),
+        Ok(_) => Some(()),
         Err(e) => {
             println!("cargo:warning=failed to find {} in vcpkg: {}", name, e);
             None

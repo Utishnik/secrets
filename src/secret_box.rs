@@ -192,8 +192,7 @@ impl<T: Bytes> SecretBox<T> {
     where
         F: FnOnce(&mut T) -> Result<U, E>,
     {
-        Box::try_new(1, |b| f(b.as_mut()))
-            .map(|b| Self { boxed: b })
+        Box::try_new(1, |b| f(b.as_mut())).map(|b| Self { boxed: b })
     }
 
     /// Returns the size in bytes of the [`SecretBox`].
@@ -287,8 +286,10 @@ impl<T: Bytes + ConstantEq> PartialEq for SecretBox<T> {
 impl<'a, T: Bytes> Ref<'a, T> {
     /// Instantiates a new `Ref`.
     fn new(boxed: &'a Box<T>) -> Self {
-        proven!(boxed.len() == 1,
-            "secrets: attempted to dereference a box with zero length");
+        proven!(
+            boxed.len() == 1,
+            "secrets: attempted to dereference a box with zero length"
+        );
 
         Self {
             boxed: boxed.unlock(),
@@ -349,8 +350,10 @@ impl<T: Bytes> Eq for Ref<'_, T> {}
 impl<'a, T: Bytes> RefMut<'a, T> {
     /// Instantiates a new `RefMut`.
     fn new(boxed: &'a mut Box<T>) -> Self {
-        proven!(boxed.len() == 1,
-            "secrets: attempted to dereference a box with zero length");
+        proven!(
+            boxed.len() == 1,
+            "secrets: attempted to dereference a box with zero length"
+        );
 
         Self {
             boxed: boxed.unlock_mut(),
@@ -429,7 +432,7 @@ mod test {
     #[test]
     fn it_allows_borrowing_immutably() {
         let secret = SecretBox::<u64>::zero();
-        let s      = secret.borrow();
+        let s = secret.borrow();
 
         assert_eq!(*s, 0);
     }
@@ -437,7 +440,7 @@ mod test {
     #[test]
     fn it_allows_borrowing_mutably() {
         let mut secret = SecretBox::<u64>::zero();
-        let mut s      = secret.borrow_mut();
+        let mut s = secret.borrow_mut();
 
         *s = 0x01ab_cdef;
 
@@ -489,7 +492,7 @@ mod test {
 
     #[test]
     fn it_safely_clones_immutable_references() {
-        let secret   = SecretBox::<u8>::random();
+        let secret = SecretBox::<u8>::random();
         let borrow_1 = secret.borrow();
         let borrow_2 = borrow_1.clone();
 
@@ -545,17 +548,21 @@ mod tests_proven_statements {
     use super::*;
 
     #[test]
-    #[should_panic(expected = "secrets: attempted to dereference a zero-length pointer")]
+    #[should_panic(
+        expected = "secrets: attempted to dereference a zero-length pointer"
+    )]
     fn it_doesnt_allow_borrowing_zero_length() {
         let boxed = Box::<u8>::zero(0);
-        let _     = boxed.as_ref();
+        let _ = boxed.as_ref();
     }
 
     #[test]
-    #[should_panic(expected = "secrets: attempted to dereference a zero-length pointer")]
+    #[should_panic(
+        expected = "secrets: attempted to dereference a zero-length pointer"
+    )]
     fn it_doesnt_allow_mutably_borrowing_zero_length() {
         let mut boxed = Box::<u8>::zero(0);
-        let     _     = boxed.as_mut();
+        let _ = boxed.as_mut();
     }
 }
 
